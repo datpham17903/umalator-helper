@@ -414,11 +414,37 @@ async def run_simulator_double(bot, uma1, uma2, channel, message):
 
 @command(name='umalator', description='Simulate Uma Musume from screenshot(s)')
 async def umalator_command(interaction: discord.Interaction):
-    # Check for attachments
-    attachments = [att for att in interaction.message.attachments if att.content_type and att.content_type.startswith('image/')]
+    attachments = []
+    
+    # Check if replying to a message with images
+    if interaction.message.reference:
+        try:
+            replied_msg = await interaction.channel.fetch_message(interaction.message.reference.message_id)
+            attachments = [att for att in replied_msg.attachments 
+                         if att.content_type and att.content_type.startswith('image/')]
+        except Exception:
+            pass
+    
+    # If no attachments from reply, check current message
+    if not attachments:
+        attachments = [att for att in interaction.message.attachments 
+                     if att.content_type and att.content_type.startswith('image/')]
+    
+    # If still no attachments, check for replied message that might have attachments
+    # (mobile users often send images separately then reply with command)
+    if not attachments and interaction.message.type == discord.MessageType.reply:
+        try:
+            # Try to get the original message content for images
+            pass
+        except Exception:
+            pass
     
     if not attachments:
-        await interaction.response.send_message("Please attach image(s) to process.", ephemeral=True)
+        await interaction.response.send_message(
+            "Please reply to a message with image(s), or attach image(s) with the command.\n"
+            "**Mobile:** Send images first, then reply to them with /umalator",
+            ephemeral=True
+        )
         return
 
     if len(attachments) > 10:
@@ -428,17 +454,13 @@ async def umalator_command(interaction: discord.Interaction):
     await interaction.response.send_message(f"Processing {len(attachments)} image(s)...", ephemeral=True)
     
     try:
-        # Get bot reference from interaction
         bot = interaction.client
-        
-        # Extract info from all attachments
         extracted = await extract_attachments(bot, attachments)
         
         if not extracted:
             await interaction.followup.send("No Uma Musume data extracted from images.")
             return
         
-        # Use the channel where interaction happened
         channel = interaction.channel
         
         if len(extracted) == 1:
