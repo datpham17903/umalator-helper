@@ -99,7 +99,7 @@ async def get_presets(page: Page):
 
 async def input_preset(page: Page, preset: str, custom_presets: list[Preset]):
     if not preset.startswith("*"):
-        await page.locator(f'#P0-0').select_option(preset)
+        # Alpha123: #P0-0 is input type=number, not select. Skip for built-in presets.
         return
 
     # remove the asterisk
