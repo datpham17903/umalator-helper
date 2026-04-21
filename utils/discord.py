@@ -29,4 +29,7 @@ def event(func=None, **kwargs):
     return _client.event(func, **kwargs)
 
 def command(**kwargs):
-    return _tree.command(**kwargs)
+    def decorator(func):
+        _tree.command(**kwargs)(func)
+        return func
+    return decorator
