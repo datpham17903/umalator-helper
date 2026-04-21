@@ -11,3 +11,17 @@
 [2026-04-21 17:08:44,669] [    INFO] client.py:670 - logging in using static token
 [2026-04-21 17:08:47] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 5c20485cd506bafbd74ba8372e93e586).
 [2026-04-21 17:08:47,227] [    INFO] gateway.py:579 - Shard ID None has connected to Gateway (Session ID: 5c20485cd506bafbd74ba8372e93e586).
+
+
+--------------------------------------
+C++ Traceback (most recent call last):
+--------------------------------------
+No stack trace in paddle, may be caused by external reasons.
+
+----------------------
+Error Message Summary:
+----------------------
+FatalError: `Termination signal` is detected by the operating system.
+  [TimeInfo: *** Aborted at 1776792280 (unix time) try "date -d @1776792280" if you are using GNU date ***]
+  [SignalInfo: *** SIGTERM (@0x1e00f) received by PID 121691 (TID 0x7f23a2333040) from PID 122895 ***]
+
