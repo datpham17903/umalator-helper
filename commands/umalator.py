@@ -322,7 +322,7 @@ async def select_preset(channel, presets, custom_presets, author_id):
     
     return view.value
 
-async def run_simulator_single(bot, uma, channel, message):
+async def run_simulator_single(bot, uma, channel, user_id):
     await channel.send(f"Processing **{uma['name']}** ({get_uma_stats(uma)})...")
 
     pw, browser, page = await setup_browser_and_page()
@@ -333,8 +333,8 @@ async def run_simulator_single(bot, uma, channel, message):
     await input_stats(page, uma)
     await input_skills(page, uma)
 
-    style = await select_style(channel, message.author.id, uma['name'])
-    preset = await select_preset(channel, presets, custom_presets, message.author.id)
+    style = await select_style(channel, user_id, uma['name'])
+    preset = await select_preset(channel, presets, custom_presets, user_id)
 
     await input_preset(page, preset, custom_presets)
     aptitude_idx_dict = await compute_aptitude_dict(page)
@@ -356,7 +356,7 @@ async def run_simulator_single(bot, uma, channel, message):
     await browser.close()
     await pw.stop()
 
-async def run_simulator_double(bot, uma1, uma2, channel, message):
+async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     await channel.send(f"Comparing **{uma1['name']}** and **{uma2['name']}**...")
 
     pw, browser, page = await setup_browser_and_page()
@@ -378,8 +378,8 @@ async def run_simulator_double(bot, uma1, uma2, channel, message):
     await input_stats(page, uma2)
     await input_skills(page, uma2)
 
-    style = await select_style(channel, message.author.id, "both")
-    preset = await select_preset(channel, presets, custom_presets, message.author.id)
+    style = await select_style(channel, user_id, "both")
+    preset = await select_preset(channel, presets, custom_presets, user_id)
 
     await input_preset(page, preset, custom_presets)
     
@@ -482,10 +482,13 @@ async def umalator_command(interaction: discord.Interaction):
         
         channel = interaction.channel
         
+        # Use interaction.user.id since message might be None
+        user_id = interaction.user.id
+        
         if len(extracted) == 1:
-            await run_simulator_single(bot, extracted[0], channel, interaction.message)
+            await run_simulator_single(bot, extracted[0], channel, user_id)
         elif len(extracted) == 2:
-            await run_simulator_double(bot, extracted[0], extracted[1], channel, interaction.message)
+            await run_simulator_double(bot, extracted[0], extracted[1], channel, user_id)
         else:
             await interaction.followup.send(f"Extracted {len(extracted)} Uma Musume. Maximum supported is 2 for comparison.")
             
