@@ -416,10 +416,28 @@ async def run_simulator_double(bot, uma1, uma2, channel, message):
 async def umalator_command(interaction: discord.Interaction):
     attachments = []
     
-    # Check if replying to a message with images
-    if interaction.message.reference:
+    # Get the message - interaction.message might be None in some contexts
+    msg = interaction.message
+    if msg is None:
         try:
-            replied_msg = await interaction.channel.fetch_message(interaction.message.reference.message_id)
+            async for m in interaction.channel.history(limit=10):
+                if m.author.id == interaction.user.id and len(m.attachments) > 0:
+                    msg = m
+                    break
+        except Exception:
+            pass
+    
+    if msg is None:
+        await interaction.response.send_message(
+            "Could not find message. Try sending images first, then use /umalator.",
+            ephemeral=True
+        )
+        return
+    
+    # Check if replying to a message with images
+    if msg.reference:
+        try:
+            replied_msg = await interaction.channel.fetch_message(msg.reference.message_id)
             attachments = [att for att in replied_msg.attachments 
                          if att.content_type and att.content_type.startswith('image/')]
         except Exception:
@@ -427,15 +445,16 @@ async def umalator_command(interaction: discord.Interaction):
     
     # If no attachments from reply, check current message
     if not attachments:
-        attachments = [att for att in interaction.message.attachments 
+        attachments = [att for att in msg.attachments 
                      if att.content_type and att.content_type.startswith('image/')]
     
     # If still no attachments, check for replied message that might have attachments
     # (mobile users often send images separately then reply with command)
-    if not attachments and interaction.message.type == discord.MessageType.reply:
+    if not attachments and msg.type == discord.MessageType.reply:
         try:
-            # Try to get the original message content for images
-            pass
+            replied_msg = await interaction.channel.fetch_message(msg.reference.message_id)
+            attachments = [att for att in replied_msg.attachments 
+                         if att.content_type and att.content_type.startswith('image/')]
         except Exception:
             pass
     
