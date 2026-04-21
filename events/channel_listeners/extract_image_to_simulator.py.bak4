@@ -98,34 +98,20 @@ async def get_presets(page: Page):
     return presets
 
 async def input_preset(page: Page, preset: str, custom_presets: list[Preset]):
-    if not preset.startswith("*"):
-        await page.locator(f'#P0-0').select_option(preset)
-        return
-
-    # remove the asterisk
-    preset_name = preset[1:]
-    custom_preset = [preset for preset in custom_presets if preset.name == preset_name][0]
-
-    await select_track_name(page, custom_preset.track_name)
-    await select_track_length(page, custom_preset.track_length)
-    await select_ground(page, custom_preset.ground)
-    await select_weather(page, custom_preset.weather)
-    await select_season(page, custom_preset.season)
-
-async def select_track_name(page: Page, track_name: str):
-    await page.locator('.trackSelect > select[tabIndex="2"]').select_option(track_name)
-
-async def select_track_length(page: Page, track_length: str):
-    await page.locator('.trackSelect > select[tabIndex="3"]').select_option(track_length)
-
-async def select_ground(page: Page, ground: str):
-    await page.locator('select.groundSelect').select_option(ground)
-
-async def select_weather(page: Page, weather: str):
-    await page.locator(f'div.weatherSelect > img[title="{weather}"]').click()
-
-async def select_season(page: Page, season: str):
-    await page.locator(f'div.seasonSelect > img[title="{season}"]').click()
+    # Alpha123: Select preset by text from Select 4
+    await page.evaluate(f'''
+        () => {{
+            const select = document.querySelectorAll('select')[4];
+            for (let opt of select.options) {{
+                if (opt.text === '{preset}') {{
+                    opt.selected = true;
+                    select.dispatchEvent(new Event('change'));
+                    break;
+                }}
+            }}
+        }}
+    ''')
+    await page.wait_for_timeout(300)
 
 async def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any], style: str):
     # Close skill picker by clicking outside
@@ -141,71 +127,29 @@ async def input_style(page, info: dict[str, any], aptitude_dict: dict[str, any],
     # set the style
     long_term_style = [s for s in style_options if s.startswith(style)][0]
     await page.locator('#umaPane > div.selected > div.horseDef > div.horseAptitudes > div > select.horseStrategySelect').select_option(long_term_style)
-    await page.wait_for_timeout(200)
 
-    # Style aptitude - find by label text
+    # set the grade of the style (tabindex 14)
     style_apt = info["aptitudes"][style]
-    await page.evaluate(f'''
-        () => {{
-            const container = [...document.querySelectorAll('#umaPane > div.selected .horseAptitudes > div')]
-                .find(d => d.innerText.includes('Style aptitude'));
-            if (container) {{
-                const dropdown = container.querySelector('.horseAptitudeSelect');
-                const option = [...dropdown.querySelectorAll('li')]
-                    .find(li => li.getAttribute('data-horse-aptitude') === '{style_apt}');
-                if (option) {{
-                    dropdown.scrollIntoViewIfNeeded();
-                    dropdown.click();
-                    option.click();
-                }}
-            }}
-        }}
-    ''')
+    await page.locator('#umaPane > div.selected div.horseAptitudeSelect[tabindex="14"]').click(force=True)
     await page.wait_for_timeout(200)
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="14"] li[data-horse-aptitude="{style_apt}"]').click(force=True)
 
 async def input_surface_and_distance(page, info: dict[str, any], aptitude_dict: dict[str, any]):
     racetrack_name = await page.evaluate("document.querySelector('.racetrackName').innerText")
     surface = "Dirt" if "Dirt" in racetrack_name else "Turf"
     distance = number_to_distance(parse_only_numbers(racetrack_name))
 
-    # Surface aptitude - find by label text
+    # surface (tabindex 10)
     surface_apt = info["aptitudes"][surface]
-    await page.evaluate(f'''
-        () => {{
-            const container = [...document.querySelectorAll('#umaPane > div.selected .horseAptitudes > div')]
-                .find(d => d.innerText.includes('Surface aptitude'));
-            if (container) {{
-                const dropdown = container.querySelector('.horseAptitudeSelect');
-                const option = [...dropdown.querySelectorAll('li')]
-                    .find(li => li.getAttribute('data-horse-aptitude') === '{surface_apt}');
-                if (option) {{
-                    dropdown.scrollIntoViewIfNeeded();
-                    dropdown.click();
-                    option.click();
-                }}
-            }}
-        }}
-    ''')
+    await page.locator('#umaPane > div.selected div.horseAptitudeSelect[tabindex="10"]').click(force=True)
     await page.wait_for_timeout(200)
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="10"] li[data-horse-aptitude="{surface_apt}"]').click(force=True)
 
-    # Distance aptitude - find by label text
+    # distance (tabindex 11)
     distance_apt = info["aptitudes"][distance]
-    await page.evaluate(f'''
-        () => {{
-            const container = [...document.querySelectorAll('#umaPane > div.selected .horseAptitudes > div')]
-                .find(d => d.innerText.includes('Distance aptitude'));
-            if (container) {{
-                const dropdown = container.querySelector('.horseAptitudeSelect');
-                const option = [...dropdown.querySelectorAll('li')]
-                    .find(li => li.getAttribute('data-horse-aptitude') === '{distance_apt}');
-                if (option) {{
-                    dropdown.scrollIntoViewIfNeeded();
-                    dropdown.click();
-                    option.click();
-                }}
-            }}
-        }}
-    ''')
+    await page.locator('#umaPane > div.selected div.horseAptitudeSelect[tabindex="11"]').click(force=True)
+    await page.wait_for_timeout(200)
+    await page.locator(f'#umaPane > div.selected div.horseAptitudeSelect[tabindex="11"] li[data-horse-aptitude="{distance_apt}"]').click(force=True)
 
 async def compute_aptitude_dict(page: Page):
     return await page.evaluate('''

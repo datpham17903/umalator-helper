@@ -2,19 +2,23 @@ import importlib
 from pathlib import Path
 from .discord import get_tree
 
+# Get the base directory (where main.py is located)
+BASE_DIR = Path(__file__).parent.parent
+
 def load_modules_from_directory(directory_path):
     """
     Dynamically load all Python modules from a directory and execute setup functions.
     """
-    directory = Path(directory_path)
+    directory = BASE_DIR / directory_path
     if not directory.exists():
+        print(f"Directory not found: {directory}")
         return
 
     for file_path in directory.glob('*.py'):
         if file_path.name.startswith('_'):
             continue
 
-        module_name = f"{directory.name}.{file_path.stem}"
+        module_name = f"{directory_path}.{file_path.stem}"
 
         try:
             importlib.import_module(module_name)

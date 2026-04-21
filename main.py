@@ -2,14 +2,18 @@ from utils.opencv import init_paddleocr
 from utils.config import get_bot_token, init_env
 from utils.discord import get_client, init_client, init_command_tree
 from utils.loader import auto_load_commands, auto_load_events
-from utils.spreadsheet import init_google_sheets_client
 
 def main():
     try:
         # initialize external services
         init_env()
         init_paddleocr()
-        init_google_sheets_client()
+        
+        # Initialize Google Sheets only if service-account.json exists
+        import os
+        if os.path.exists('service-account.json'):
+            from utils.spreadsheet import init_google_sheets_client
+            init_google_sheets_client()
 
         # initialize bot
         init_client()
