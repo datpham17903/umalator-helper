@@ -11,50 +11,35 @@ https://www.youtube.com/watch?v=dNzNqTIrdrQ
 ## Features
 
 - **Veteran Screenshot Parsing**: Upload screenshots of veteran Umamusume characters to automatically extract character data (name, stats, skills, aptitudes) using OpenCV and PaddleOCR
-- **Simulator Integration**: Automatically fills extracted data into the simulator and returns a pre-configured simulator URL
-- **Club Management** (Legacy): Video processing and spreadsheet logging for club member tracking (Note: Club info tracking is now better handled by [chronogenesis.net](https://chronogenesis.net/))
+- **Simulator Integration**: Automatically fills extracted data into the simulator (alpha123 and kachi-dev) and returns pre-configured simulator URLs
+- **Compare Mode**: Compare two characters side-by-side when uploading two screenshots
 
 ## Setup
+
+### Prerequisites
+
+- Python 3.10+
+- Discord bot token
+- PaddleOCR models (auto-downloaded on first run)
 
 ### Option 1: Docker Compose (Recommended)
 
 1. Copy `example.env` to `production.env` and configure:
    - Discord bot credentials
-   - PostgreSQL database URL
 
 2. Run with Docker Compose:
    ```bash
-   docker-compose up --build -d # using --build flag to prevent missing any updates
+   docker-compose up --build -d
    ```
 
-### Option 2: Docker
+### Option 2: Manual Python Setup
 
 1. Copy `example.env` to `.env` and configure:
    - Discord bot credentials
-   - PostgreSQL database URL
-
-2. Build the Docker image:
-   ```bash
-   docker build -t uma-bot .
-   ```
-
-3. Run the container:
-   ```bash
-   docker run --env-file .env uma-bot
-   ```
-
-### Option 3: Manual Python Setup
-
-1. Copy `example.env` to `.env` and configure:
-   - Discord bot credentials
-   - PostgreSQL database URL
 
 2. Create and activate a virtual environment:
    ```bash
    python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On Linux/Mac:
    source venv/bin/activate
    ```
 
@@ -89,18 +74,6 @@ https://www.youtube.com/watch?v=dNzNqTIrdrQ
 - `/list-presets` - List all custom presets
 - `/delete-preset` - Delete an existing preset
 
-### Club Management (Legacy)
-
-- `/create-club <name>` - Create a new club (requires administrator)
-- `/list-clubs` - List all clubs in this server (requires administrator)
-- `/delete-club <name>` - Delete a club (requires administrator)
-- `/setup-channel-club-records` - Toggle current channel as video upload destination for a club (requires administrator)
-
-### Spreadsheet Integration (Legacy)
-
-- `/enable-spreadsheet-logging <spreadsheet_id>` - Enable automatic Google Sheets logging for a club (requires administrator)
-- `/disable-spreadsheet-logging` - Disable spreadsheet logging for a club (requires administrator)
-
 ### Development
 
 - `/nuke-db` - [DEV] Drop and recreate all database tables (requires administrator, DEV environment only)
@@ -116,12 +89,18 @@ https://www.youtube.com/watch?v=dNzNqTIrdrQ
    - Create a thread for the analysis
    - Prompt you to select a running style (Front/Pace/Late/End) and simulator preset
    - Automatically fill the data into the simulator
-   - Run the simulation and return a pre-configured simulator URL with a screenshot
+   - Run the simulation and return pre-configured simulator URLs (alpha123 and kachi-dev) with a screenshot
 
 The bot supports comparing two characters side-by-side when two screenshots are uploaded.
 
-### Legacy Club Management
+## Supported Simulators
 
-Upload a video recording of your Uma Musume club member list to a configured channel. The bot will automatically process the video, extract member information (names, fan counts, roles, last login), and update the associated Google Sheet with timestamped data.
+- [alpha123](https://github.com/alpha123/uma-tools) - https://alpha123.github.io/uma-tools/umalator-global/
+- [kachi-dev](https://github.com/kachi-dev/uma-tools) - https://kachi-dev.github.io/uma-tools/umalator-global/
 
-Note: For club information tracking, [chronogenesis.net](https://chronogenesis.net/) provides a more convenient web-based solution.
+## Tech Stack
+
+- **Discord.py** - Discord API wrapper
+- **Playwright** - Browser automation for simulator interaction
+- **PaddleOCR** - OCR for screenshot parsing
+- **SQLite** - Local database for presets and configurations
