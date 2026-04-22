@@ -342,15 +342,52 @@ async def run_simulator_single(bot, uma, channel, user_id):
     await input_surface_and_distance(page, uma, aptitude_idx_dict)
     await simulate(page)
     
-    screenshot = await page.screenshot()
-    url = await copy_link(page)
-    kachi_url = url.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    # Alpha123
+    screenshot_alpha = await page.screenshot()
+    url_alpha = await copy_link(page)
     
     await channel.send(
-        f"**{uma['name']}**\n"
-        f"Simulator alpha123: [here]({url})\n"
-        f"Simulator kachi-dev: [here]({kachi_url})",
-        file=discord.File(io.BytesIO(screenshot), filename=f"{uma['name']}.png")
+        f"**{uma['name']}** - alpha123\n"
+        f"Link: [here]({url_alpha})",
+        file=discord.File(io.BytesIO(screenshot_alpha), filename=f"{uma['name']}_alpha.png")
+    )
+    
+    # Kachi-dev: navigate to kachi URL with same parameters
+    url_kachi = url_alpha.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    await page.goto(url_kachi)
+    await page.wait_for_timeout(2000)
+    
+    # Fill data on kachi-dev using JavaScript
+    await page.evaluate(f'''
+        () => {{
+            // Fill uma name
+            const umaInput = document.querySelector('input.umaSelectInput');
+            if (umaInput) {{
+                umaInput.value = '{uma["name"]}';
+                umaInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            }}
+            
+            // Fill stats (inputs 7-11 on kachi)
+            const statMap = ['Speed', 'Stamina', 'Power', 'Guts', 'Wit'];
+            const stats = {uma['stats']};
+            statMap.forEach((stat, i) => {{
+                const input = document.querySelectorAll('input[type="number"]')[{7 + i}];
+                if (input && stats[stat] !== undefined) {{
+                    input.value = stats[stat];
+                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                }}
+            }});
+        }}
+    ''')
+    await page.wait_for_timeout(500)
+    
+    await simulate(page)
+    screenshot_kachi = await page.screenshot()
+    
+    await channel.send(
+        f"**{uma['name']}** - kachi-dev\n"
+        f"Link: [here]({url_kachi})",
+        file=discord.File(io.BytesIO(screenshot_kachi), filename=f"{uma['name']}_kachi.png")
     )
     
     await browser.close()
