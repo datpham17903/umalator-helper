@@ -1,6 +1,8 @@
 import discord
 import uuid
 import json
+import time
+from collections import defaultdict
 from playwright.async_api import Browser, Page, PlaywrightContextManager, async_playwright
 from rapidfuzz import process, fuzz
 from utils.db import Preset, SessionLocal
@@ -10,6 +12,17 @@ from utils.blocking import run_blocking
 import os
 import io
 import asyncio
+
+# Concurrency control: max 3 simultaneous browser instances
+MAX_CONCURRENT_BROWSERS = 3
+browser_semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
+
+# Per-user rate limiting: max 1 request per 30 seconds per user
+USER_RATE_LIMIT = 30
+user_last_request = defaultdict(float)
+
+# Per-channel processing lock (prevent same user flooding same channel)
+channel_processing = defaultdict(set)  # channel_id -> set of user_ids currently processing
 
 def fuzzy_match(a: str, b: list[str]):
     best_match, _, _ = process.extractOne(a, b, scorer=fuzz.WRatio)
@@ -536,26 +549,46 @@ async def run_simulator_double(uma1: dict[str, any], uma2: dict[str, any], threa
     await pw.stop()
 
 async def extract_image_to_simulator(bot: discord.Client, message: discord.Message):
+    # Rate limit check
+    user_id = message.author.id
+    channel_id = str(message.channel.id)
+    current_time = time.time()
+    
+    if user_last_request[user_id] > 0 and (current_time - user_last_request[user_id]) < USER_RATE_LIMIT:
+        remaining = int(USER_RATE_LIMIT - (current_time - user_last_request[user_id]))
+        await message.channel.send(f"Please wait {remaining}s before sending another image. (Rate limit: 1 request per {USER_RATE_LIMIT}s)")
+        return
+    
+    # Check if user is already processing in this channel
+    if user_id in channel_processing[channel_id]:
+        await message.channel.send("You already have a request processing in this channel. Please wait for it to complete.")
+        return
+    
+    user_last_request[user_id] = current_time
+    channel_processing[channel_id].add(user_id)
+    
     # attachment check
     attachments = await attachment_check(message)
     if not len(attachments):
+        channel_processing[channel_id].discard(user_id)
         await message.channel.send("No images found, expected at least one image of a veteran uma screenshot.")
         return
 
     thread = await message.create_thread(name='analyzing...')
-    umas = await extract_attachments(bot, attachments)
+    
+    async with browser_semaphore:
+        try:
+            umas = await extract_attachments(bot, attachments)
 
-    if len(umas) == 0:
-        await thread.edit(name='failed analysis')
-        await thread.send("No umas found, expected at least one uma screenshot.")
-        return
-    elif len(umas) == 1:
-        await run_simulator_single(umas[0], thread, message)
-        return
-    elif len(umas) == 2:
-        await run_simulator_double(umas[0], umas[1], thread, message)
-        return
-    else:
-        await thread.edit(name='failed analysis')
-        await thread.send("Too many umas found, currently not supported to run simulator for more than two umas.")
-        return
+            if len(umas) == 0:
+                await thread.edit(name='failed analysis')
+                await thread.send("No umas found, expected at least one uma screenshot.")
+            elif len(umas) == 1:
+                await run_simulator_single(umas[0], thread, message)
+            elif len(umas) == 2:
+                await run_simulator_double(umas[0], umas[1], thread, message)
+            else:
+                await thread.edit(name='failed analysis')
+                await thread.send("Too many umas found, currently not supported to run simulator for more than two umas.")
+        finally:
+            channel_processing[channel_id].discard(user_id)

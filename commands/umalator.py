@@ -4,6 +4,8 @@ import json
 import io
 import os
 import asyncio
+import time
+from collections import defaultdict
 from discord.ui import View
 from utils.discord import command
 from utils.db import SessionLocal, Preset
@@ -12,6 +14,14 @@ from opencv.veteran_umamusume_parsing import extract_image
 from utils.blocking import run_blocking
 from rapidfuzz import process, fuzz
 from playwright.async_api import async_playwright
+
+# Concurrency control: max 3 simultaneous browser instances
+MAX_CONCURRENT_BROWSERS = 3
+browser_semaphore = asyncio.Semaphore(MAX_CONCURRENT_BROWSERS)
+
+# Per-user rate limiting: max 1 request per 30 seconds per user
+USER_RATE_LIMIT = 30  # seconds
+user_last_request = defaultdict(float)
 
 def fuzzy_match(a: str, b: list[str]):
     best_match, _, _ = process.extractOne(a, b, scorer=fuzz.WRatio)
@@ -488,29 +498,40 @@ async def umalator_command(interaction: discord.Interaction):
         await interaction.response.send_message("Maximum 10 images allowed.", ephemeral=True)
         return
 
-    await interaction.response.send_message(f"Processing {len(attachments)} image(s)...", ephemeral=True)
+    # Rate limit check
+    user_id = interaction.user.id
+    current_time = time.time()
+    if user_last_request[user_id] > 0 and (current_time - user_last_request[user_id]) < USER_RATE_LIMIT:
+        remaining = int(USER_RATE_LIMIT - (current_time - user_last_request[user_id]))
+        await interaction.response.send_message(
+            f"Please wait {remaining}s before using /umalator again. (Rate limit: 1 request per {USER_RATE_LIMIT}s)",
+            ephemeral=True
+        )
+        return
+    user_last_request[user_id] = current_time
+
+    # Wait for semaphore (concurrency limit)
+    await interaction.response.send_message(f"Processing {len(attachments)} image(s)... (Waiting for available slot...)", ephemeral=True)
     
-    try:
-        bot = interaction.client
-        extracted = await extract_attachments(bot, attachments)
-        
-        if not extracted:
-            await interaction.followup.send("No Uma Musume data extracted from images.")
-            return
-        
-        channel = interaction.channel
-        
-        # Use interaction.user.id since message might be None
-        user_id = interaction.user.id
-        
-        if len(extracted) == 1:
-            await run_simulator_single(bot, extracted[0], channel, user_id)
-        elif len(extracted) == 2:
-            await run_simulator_double(bot, extracted[0], extracted[1], channel, user_id)
-        else:
-            await interaction.followup.send(f"Extracted {len(extracted)} Uma Musume. Maximum supported is 2 for comparison.")
+    async with browser_semaphore:
+        try:
+            bot = interaction.client
+            extracted = await extract_attachments(bot, attachments)
             
-    except Exception as e:
-        await interaction.followup.send(f"Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+            if not extracted:
+                await interaction.followup.send("No Uma Musume data extracted from images.")
+                return
+            
+            channel = interaction.channel
+            
+            if len(extracted) == 1:
+                await run_simulator_single(bot, extracted[0], channel, user_id)
+            elif len(extracted) == 2:
+                await run_simulator_double(bot, extracted[0], extracted[1], channel, user_id)
+            else:
+                await interaction.followup.send(f"Extracted {len(extracted)} Uma Musume. Maximum supported is 2 for comparison.")
+                
+        except Exception as e:
+            await interaction.followup.send(f"Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
