@@ -347,7 +347,6 @@ async def select_uma_slot(page: Page, slot: str):
 
 async def run_simulator_single(bot, uma, channel, user_id):
     await channel.send(f"Processing **{uma['name']}** ({get_uma_stats(uma)})...")
-    await channel.send(f"```json\n{json.dumps(uma, indent=2)}\n```")
 
     pw, browser, page = await setup_browser_and_page()
     presets = await get_presets(page)
@@ -420,7 +419,6 @@ async def run_simulator_single(bot, uma, channel, user_id):
 
 async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     await channel.send(f"Comparing **{uma1['name']}** and **{uma2['name']}**...")
-    await channel.send(f"```json\n{json.dumps(uma1, indent=2)}\n```\n```json\n{json.dumps(uma2, indent=2)}\n```")
 
     # parallel tasks
     future_list = []
