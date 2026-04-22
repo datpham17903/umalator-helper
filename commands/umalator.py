@@ -456,49 +456,30 @@ async def umalator_command(interaction: discord.Interaction):
     # Get the message - interaction.message might be None in some contexts
     msg = interaction.message
     if msg is None:
-        try:
-            async for m in interaction.channel.history(limit=10):
-                if m.author.id == interaction.user.id and len(m.attachments) > 0:
-                    msg = m
-                    break
-        except Exception:
-            pass
-    
-    if msg is None:
         await interaction.response.send_message(
-            "Could not find message. Try sending images first, then use /umalator.",
+            "Could not not find message. Please try again.",
             ephemeral=True
         )
         return
     
-    # Check if replying to a message with images
-    if msg.reference:
-        try:
-            replied_msg = await interaction.channel.fetch_message(msg.reference.message_id)
-            attachments = [att for att in replied_msg.attachments 
-                         if att.content_type and att.content_type.startswith('image/')]
-        except Exception:
-            pass
-    
-    # If no attachments from reply, check current message
-    if not attachments:
+    # Check if current message has attachments directly
+    if msg.attachments:
         attachments = [att for att in msg.attachments 
                      if att.content_type and att.content_type.startswith('image/')]
     
-    # If still no attachments, check for replied message that might have attachments
-    # (mobile users often send images separately then reply with command)
-    if not attachments and msg.type == discord.MessageType.reply:
+    # If current message has no attachments, check if it's a reply to another message with images
+    if not attachments and msg.reference:
         try:
             replied_msg = await interaction.channel.fetch_message(msg.reference.message_id)
-            attachments = [att for att in replied_msg.attachments 
-                         if att.content_type and att.content_type.startswith('image/')]
+            if replied_msg and replied_msg.attachments:
+                attachments = [att for att in replied_msg.attachments 
+                             if att.content_type and att.content_type.startswith('image/')]
         except Exception:
             pass
     
     if not attachments:
         await interaction.response.send_message(
-            "Please reply to a message with image(s), or attach image(s) with the command.\n"
-            "**Mobile:** Send images first, then reply to them with /umalator",
+            "No images found. Please attach images directly with the command, or reply to a message with images using /umalator.",
             ephemeral=True
         )
         return
