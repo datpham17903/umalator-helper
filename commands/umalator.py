@@ -414,13 +414,13 @@ async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     await input_skills(page, uma1)
     
     # Select first uma slot
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Uma 1")').click()
+    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
     await input_name(page, uma1)
     await input_stats(page, uma1)
     await input_skills(page, uma1)
 
     # Select second uma slot  
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Uma 2")').click()
+    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
     await input_name(page, uma2)
     await input_stats(page, uma2)
     await input_skills(page, uma2)
@@ -434,12 +434,12 @@ async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     aptitude_idx_dict = await compute_aptitude_dict(page)
     
     # Apply to Uma 1
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Uma 1")').click()
+    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
     await input_style(page, uma1, aptitude_idx_dict, style)
     await input_surface_and_distance(page, uma1, aptitude_idx_dict)
     
     # Apply to Uma 2
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Uma 2")').click()
+    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
     await input_style(page, uma2, aptitude_idx_dict, style)
     await input_surface_and_distance(page, uma2, aptitude_idx_dict)
     
