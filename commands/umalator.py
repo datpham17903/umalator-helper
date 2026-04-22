@@ -358,6 +358,8 @@ async def run_simulator_single(bot, uma, channel, user_id):
     await page.wait_for_timeout(2000)
     
     # Fill data on kachi-dev using JavaScript
+    stats = uma['stats']
+    stats_json = json.dumps(stats)
     await page.evaluate(f'''
         () => {{
             // Fill uma name
@@ -368,15 +370,13 @@ async def run_simulator_single(bot, uma, channel, user_id):
             }}
             
             // Fill stats (inputs 7-11 on kachi)
-            const statMap = ['Speed', 'Stamina', 'Power', 'Guts', 'Wit'];
-            const stats = {uma['stats']};
-            statMap.forEach((stat, i) => {{
-                const input = document.querySelectorAll('input[type="number"]')[{7 + i}];
-                if (input && stats[stat] !== undefined) {{
-                    input.value = stats[stat];
-                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                }}
-            }});
+            const stats = {stats_json};
+            const inputs = document.querySelectorAll('input[type="number"]');
+            if (inputs[7]) {{ inputs[7].value = stats.Speed || 0; inputs[7].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
+            if (inputs[8]) {{ inputs[8].value = stats.Stamina || 0; inputs[8].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
+            if (inputs[9]) {{ inputs[9].value = stats.Power || 0; inputs[9].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
+            if (inputs[10]) {{ inputs[10].value = stats.Guts || 0; inputs[10].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
+            if (inputs[11]) {{ inputs[11].value = stats.Wit || 0; inputs[11].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
         }}
     ''')
     await page.wait_for_timeout(500)
