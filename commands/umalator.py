@@ -13,7 +13,7 @@ from utils.parse import parse_only_numbers
 from opencv.veteran_umamusume_parsing import extract_image
 from utils.blocking import run_blocking
 from rapidfuzz import process, fuzz
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, Page
 
 # Concurrency control: max 3 simultaneous browser instances
 MAX_CONCURRENT_BROWSERS = 3
@@ -342,13 +342,18 @@ async def select_preset(channel, presets, custom_presets, author_id):
     
     return view.value
 
+async def select_uma_slot(page: Page, slot: str):
+    await page.locator(f'#umaPane > div.selected div.umaTab:has-text("{slot}")').click()
+
 async def run_simulator_single(bot, uma, channel, user_id):
     await channel.send(f"Processing **{uma['name']}** ({get_uma_stats(uma)})...")
+    await channel.send(f"```json\n{json.dumps(uma, indent=2)}\n```")
 
     pw, browser, page = await setup_browser_and_page()
     presets = await get_presets(page)
     custom_presets = get_custom_presets()
 
+    # Input data (name, stats, skills)
     await input_name(page, uma)
     await input_stats(page, uma)
     await input_skills(page, uma)
@@ -362,43 +367,43 @@ async def run_simulator_single(bot, uma, channel, user_id):
     await input_surface_and_distance(page, uma, aptitude_idx_dict)
     await simulate(page)
     
-    # Alpha123
+    # Alpha123 screenshot and link
     screenshot_alpha = await page.screenshot()
     url_alpha = await copy_link(page)
     
     await channel.send(
-        f"**{uma['name']}** - alpha123\n"
-        f"Link: [here]({url_alpha})",
-        file=discord.File(io.BytesIO(screenshot_alpha), filename=f"{uma['name']}_alpha.png")
+        f"Simulator alpha123: [here]({url_alpha})",
+        file=discord.File(io.BytesIO(screenshot_alpha), filename="alpha.png")
     )
     
-    # Kachi-dev: navigate to kachi URL with same parameters
+    # Kachi-dev: navigate and take screenshot
     url_kachi = url_alpha.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
     await page.goto(url_kachi)
     await page.wait_for_timeout(2000)
     
-    # Fill data on kachi-dev using JavaScript
-    stats = uma['stats']
-    stats_json = json.dumps(stats)
+    # Fill data on kachi
+    stats = uma.get("stats", {})
     await page.evaluate(f'''
         () => {{
-            // Fill uma name
-            const umaInput = document.querySelector('input.umaSelectInput');
-            if (umaInput) {{
-                umaInput.value = '{uma["name"]}';
-                umaInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            }}
-            
-            // Fill stats (inputs 7-11 on kachi)
-            const stats = {stats_json};
             const inputs = document.querySelectorAll('input[type="number"]');
-            if (inputs[7]) {{ inputs[7].value = stats.Speed || 0; inputs[7].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
-            if (inputs[8]) {{ inputs[8].value = stats.Stamina || 0; inputs[8].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
-            if (inputs[9]) {{ inputs[9].value = stats.Power || 0; inputs[9].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
-            if (inputs[10]) {{ inputs[10].value = stats.Guts || 0; inputs[10].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
-            if (inputs[11]) {{ inputs[11].value = stats.Wit || 0; inputs[11].dispatchEvent(new Event('input', {{ bubbles: true }})); }}
+            if (inputs[7]) {{ inputs[7].value = {stats.get("Speed", 0)}; }}
+            if (inputs[8]) {{ inputs[8].value = {stats.get("Stamina", 0)}; }}
+            if (inputs[9]) {{ inputs[9].value = {stats.get("Power", 0)}; }}
+            if (inputs[10]) {{ inputs[10].value = {stats.get("Guts", 0)}; }}
+            if (inputs[11]) {{ inputs[11].value = {stats.get("Wit", 0)}; }}
         }}
     ''')
+    await page.wait_for_timeout(500)
+    await simulate(page)
+    screenshot_kachi = await page.screenshot()
+    
+    await channel.send(
+        f"Simulator kachi-dev: [here]({url_kachi})",
+        file=discord.File(io.BytesIO(screenshot_kachi), filename="kachi.png")
+    )
+    
+    await browser.close()
+    await pw.stop()
     await page.wait_for_timeout(500)
     
     await simulate(page)
@@ -415,55 +420,63 @@ async def run_simulator_single(bot, uma, channel, user_id):
 
 async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     await channel.send(f"Comparing **{uma1['name']}** and **{uma2['name']}**...")
+    await channel.send(f"```json\n{json.dumps(uma1, indent=2)}\n```\n```json\n{json.dumps(uma2, indent=2)}\n```")
 
-    pw, browser, page = await setup_browser_and_page()
-    presets = await get_presets(page)
+    # parallel tasks
+    future_list = []
+
+    async def browser_init_and_page_init():
+        pw, browser, page = await setup_browser_and_page()
+        presets = await get_presets(page)
+
+        async def fill_data(slot, uma):
+            await select_uma_slot(page, slot)
+            await input_name(page, uma)
+            await input_stats(page, uma)
+            await input_skills(page, uma)
+
+        await fill_data('Umamusume 1', uma1)
+        await fill_data('Umamusume 2', uma2)
+        return pw, browser, page, presets
+
+    future_list.append(select_style(channel, user_id, f"`{uma1['name']} ({get_uma_stats(uma1)}`)"))
+    future_list.append(select_style(channel, user_id, f"`{uma2['name']} ({get_uma_stats(uma2)}`)"))
+    future_list.append(browser_init_and_page_init())
+    style1, style2, (pw, browser, page, presets) = await asyncio.gather(*future_list)
     custom_presets = get_custom_presets()
 
-    # Select first uma slot and fill data
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
-    await input_name(page, uma1)
-    await input_stats(page, uma1)
-    await input_skills(page, uma1)
-
-    # Select second uma slot and fill data
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
-    await input_name(page, uma2)
-    await input_stats(page, uma2)
-    await input_skills(page, uma2)
-
-    # Select style for EACH uma separately (like channel-based)
-    style1 = await select_style(channel, user_id, f"`{uma1['name']}`")
-    style2 = await select_style(channel, user_id, f"`{uma2['name']}`")
     preset = await select_preset(channel, presets, custom_presets, user_id)
-
     await input_preset(page, preset, custom_presets)
-    
-    # Apply style/aptitudes SEPARATELY for each uma
-    
-    # Apply to Uma 1
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
-    aptitude_idx_dict = await compute_aptitude_dict(page)
-    await input_style(page, uma1, aptitude_idx_dict, style1)
-    await input_surface_and_distance(page, uma1, aptitude_idx_dict)
-    
-    # Apply to Uma 2
-    await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
-    aptitude_idx_dict = await compute_aptitude_dict(page)
-    await input_style(page, uma2, aptitude_idx_dict, style2)
-    await input_surface_and_distance(page, uma2, aptitude_idx_dict)
-    
+
+    async def set_style_and_surface_and_distance(slot, uma, style):
+        await select_uma_slot(page, slot)
+        aptitude_idx_dict = await compute_aptitude_dict(page)
+        await input_style(page, uma, aptitude_idx_dict, style)
+        await input_surface_and_distance(page, uma, aptitude_idx_dict)
+
+    await set_style_and_surface_and_distance('Umamusume 1', uma1, style1)
+    await set_style_and_surface_and_distance('Umamusume 2', uma2, style2)
     await simulate(page)
     
-    screenshot = await page.screenshot()
-    url = await copy_link(page)
-    kachi_url = url.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    # Alpha123 screenshot and link
+    screenshot_alpha = await page.screenshot()
+    url_alpha = await copy_link(page)
     
     await channel.send(
-        f"**{uma1['name']}** vs **{uma2['name']}**\n"
-        f"Simulator alpha123: [here]({url})\n"
-        f"Simulator kachi-dev: [here]({kachi_url})",
-        file=discord.File(io.BytesIO(screenshot), filename="compare.png")
+        f"Simulator alpha123: [here]({url_alpha})",
+        file=discord.File(io.BytesIO(screenshot_alpha), filename="alpha.png")
+    )
+    
+    # Kachi-dev
+    url_kachi = url_alpha.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    await page.goto(url_kachi)
+    await page.wait_for_timeout(2000)
+    await simulate(page)
+    screenshot_kachi = await page.screenshot()
+    
+    await channel.send(
+        f"Simulator kachi-dev: [here]({url_kachi})",
+        file=discord.File(io.BytesIO(screenshot_kachi), filename="kachi.png")
     )
     
     await browser.close()
