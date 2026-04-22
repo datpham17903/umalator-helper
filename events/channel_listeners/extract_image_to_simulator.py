@@ -427,17 +427,41 @@ async def run_simulator_single(uma: dict[str, any], thread: discord.Thread, mess
     await input_surface_and_distance(page, uma, aptitude_idx_dict)
     await simulate(page)
     
-    screenshot = await page.screenshot()
-    url = await copy_link(page)
-    
-    # Generate both alpha123 and kachi-dev URLs
-    kachi_url = url.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    # Alpha123 screenshot and link
+    screenshot_alpha = await page.screenshot()
+    url_alpha = await copy_link(page)
     
     await thread.send(
-        f"Simulator alpha123: [here]({url})\n"
-        f"Simulator kachi-dev: [here]({kachi_url})",
-        file=discord.File(io.BytesIO(screenshot), filename="_.png")
+        f"Simulator alpha123: [here]({url_alpha})",
+        file=discord.File(io.BytesIO(screenshot_alpha), filename="alpha.png")
     )
+    
+    # Kachi-dev: navigate and take screenshot
+    url_kachi = url_alpha.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    await page.goto(url_kachi)
+    await page.wait_for_timeout(2000)
+    
+    # Fill data on kachi
+    stats = uma.get("stats", {})
+    await page.evaluate(f'''
+        () => {{
+            const inputs = document.querySelectorAll('input[type="number"]');
+            if (inputs[7]) {{ inputs[7].value = {stats.get("Speed", 0)}; }}
+            if (inputs[8]) {{ inputs[8].value = {stats.get("Stamina", 0)}; }}
+            if (inputs[9]) {{ inputs[9].value = {stats.get("Power", 0)}; }}
+            if (inputs[10]) {{ inputs[10].value = {stats.get("Guts", 0)}; }}
+            if (inputs[11]) {{ inputs[11].value = {stats.get("Wit", 0)}; }}
+        }}
+    ''')
+    await page.wait_for_timeout(500)
+    await simulate(page)
+    screenshot_kachi = await page.screenshot()
+    
+    await thread.send(
+        f"Simulator kachi-dev: [here]({url_kachi})",
+        file=discord.File(io.BytesIO(screenshot_kachi), filename="kachi.png")
+    )
+    
     await browser.close()
     await pw.stop()
 
@@ -487,17 +511,27 @@ async def run_simulator_double(uma1: dict[str, any], uma2: dict[str, any], threa
     await set_style_and_surface_and_distance('Umamusume 2', uma2, style2)
     await simulate(page)
     
-    screenshot = await page.screenshot()
-    url = await copy_link(page)
-    
-    # Generate both alpha123 and kachi-dev URLs
-    kachi_url = url.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    # Alpha123 screenshot and link
+    screenshot_alpha = await page.screenshot()
+    url_alpha = await copy_link(page)
     
     await thread.send(
-        f"Simulator alpha123: [here]({url})\n"
-        f"Simulator kachi-dev: [here]({kachi_url})",
-        file=discord.File(io.BytesIO(screenshot), filename="_.png")
+        f"Simulator alpha123: [here]({url_alpha})",
+        file=discord.File(io.BytesIO(screenshot_alpha), filename="alpha.png")
     )
+    
+    # Kachi-dev
+    url_kachi = url_alpha.replace("alpha123.github.io/uma-tools", "kachi-dev.github.io/uma-tools")
+    await page.goto(url_kachi)
+    await page.wait_for_timeout(2000)
+    await simulate(page)
+    screenshot_kachi = await page.screenshot()
+    
+    await thread.send(
+        f"Simulator kachi-dev: [here]({url_kachi})",
+        file=discord.File(io.BytesIO(screenshot_kachi), filename="kachi.png")
+    )
+    
     await browser.close()
     await pw.stop()
 
