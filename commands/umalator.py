@@ -420,37 +420,37 @@ async def run_simulator_double(bot, uma1, uma2, channel, user_id):
     presets = await get_presets(page)
     custom_presets = get_custom_presets()
 
-    await input_name(page, uma1)
-    await input_skills(page, uma1)
-    
-    # Select first uma slot
+    # Select first uma slot and fill data
     await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
     await input_name(page, uma1)
     await input_stats(page, uma1)
     await input_skills(page, uma1)
 
-    # Select second uma slot  
+    # Select second uma slot and fill data
     await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
     await input_name(page, uma2)
     await input_stats(page, uma2)
     await input_skills(page, uma2)
 
-    style = await select_style(channel, user_id, "both")
+    # Select style for EACH uma separately (like channel-based)
+    style1 = await select_style(channel, user_id, f"`{uma1['name']}`")
+    style2 = await select_style(channel, user_id, f"`{uma2['name']}`")
     preset = await select_preset(channel, presets, custom_presets, user_id)
 
     await input_preset(page, preset, custom_presets)
     
-    # Apply style/aptitudes for both
-    aptitude_idx_dict = await compute_aptitude_dict(page)
+    # Apply style/aptitudes SEPARATELY for each uma
     
     # Apply to Uma 1
     await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 1")').click()
-    await input_style(page, uma1, aptitude_idx_dict, style)
+    aptitude_idx_dict = await compute_aptitude_dict(page)
+    await input_style(page, uma1, aptitude_idx_dict, style1)
     await input_surface_and_distance(page, uma1, aptitude_idx_dict)
     
     # Apply to Uma 2
     await page.locator('#umaPane > div.selected div.umaTab:has-text("Umamusume 2")').click()
-    await input_style(page, uma2, aptitude_idx_dict, style)
+    aptitude_idx_dict = await compute_aptitude_dict(page)
+    await input_style(page, uma2, aptitude_idx_dict, style2)
     await input_surface_and_distance(page, uma2, aptitude_idx_dict)
     
     await simulate(page)
