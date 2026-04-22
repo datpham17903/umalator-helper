@@ -60,14 +60,18 @@ async def input_skills(page: Page, info: dict[str, any]):
     skills_ids = [skills_dict[skill] for skill in true_skills]
 
     for skill_id in skills_ids:
+        # First check if this skill is already selected in the current slot
+        selected_skills = await page.evaluate('''
+            [...document.querySelectorAll('#umaPane > div.selected .skillList .skill[data-skillid]')].map(e => e.getAttribute('data-skillid'))
+        ''')
+        if skill_id in selected_skills:
+            print(f"Skill {skill_id} already selected in slot, skipping")
+            continue
+        
         await page.locator('#umaPane > div.selected button.skill.addSkillButton').click()
         await page.wait_for_timeout(300)
-        skill = page.locator(f'#umaPane > div.selected .horseSkillPickerWrapper.open .skill[data-skillid="{skill_id}"]')
-        is_selected = await skill.evaluate('el => el.classList.contains("selected")')
-        if not is_selected:
-            await skill.click(force=True)
-        else:
-            print(f"Skill {skill_id} already selected, skipping")
+        skill_picker = page.locator(f'#umaPane > div.selected .horseSkillPickerWrapper.open .skill[data-skillid="{skill_id}"]')
+        await skill_picker.click(force=True)
 
 async def input_stats(page: Page, info: dict[str, any]):
     # Alpha123: stats are in .horseParam inputs (5 visible ones at y ~231)
