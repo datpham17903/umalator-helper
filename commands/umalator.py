@@ -462,23 +462,15 @@ async def run_simulator_double(bot, uma1, uma2, channel, user_id):
 @command(name='umalator', description='Simulate Uma Musume from screenshot(s)')
 async def umalator_command(interaction: discord.Interaction):
     attachments = []
-    
-    # Get the message - interaction.message might be None in some contexts
     msg = interaction.message
-    if msg is None:
-        await interaction.response.send_message(
-            "Could not not find message. Please try again.",
-            ephemeral=True
-        )
-        return
     
-    # Check if current message has attachments directly
-    if msg.attachments:
+    # Try to get message with attachments
+    if msg and msg.attachments:
         attachments = [att for att in msg.attachments 
                      if att.content_type and att.content_type.startswith('image/')]
     
-    # If current message has no attachments, check if it's a reply to another message with images
-    if not attachments and msg.reference:
+    # Check if replying to a message with images
+    if not attachments and msg and msg.reference:
         try:
             replied_msg = await interaction.channel.fetch_message(msg.reference.message_id)
             if replied_msg and replied_msg.attachments:
@@ -487,9 +479,22 @@ async def umalator_command(interaction: discord.Interaction):
         except Exception:
             pass
     
+    # If still no attachments, find the user's own recent message with images
+    if not attachments:
+        try:
+            async for m in interaction.channel.history(limit=20):
+                if m.author.id == interaction.user.id and m.attachments:
+                    attachments = [att for att in m.attachments 
+                                 if att.content_type and att.content_type.startswith('image/')]
+                    if attachments:
+                        msg = m
+                        break
+        except Exception:
+            pass
+    
     if not attachments:
         await interaction.response.send_message(
-            "No images found. Please attach images directly with the command, or reply to a message with images using /umalator.",
+            "No images found. Please send images first, then use /umalator.",
             ephemeral=True
         )
         return
