@@ -59,7 +59,14 @@ async def input_skills(page, info):
 
     for skill_id in skills_ids:
         await page.locator('#umaPane > div.selected button.skill.addSkillButton').click()
-        await page.locator(f'#umaPane > div.selected .horseSkillPickerWrapper.open .skill[data-skillid="{skill_id}"]').click()
+        await page.wait_for_timeout(300)
+        skill = page.locator(f'#umaPane > div.selected .horseSkillPickerWrapper.open .skill[data-skillid="{skill_id}"]')
+        # Check if already selected (has 'selected' class)
+        is_selected = await skill.evaluate('el => el.classList.contains("selected")')
+        if not is_selected:
+            await skill.click(force=True)
+        else:
+            print(f"Skill {skill_id} already selected, skipping")
 
 async def input_stats(page, info):
     stats = info.get("stats", {})
